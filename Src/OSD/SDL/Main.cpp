@@ -337,7 +337,8 @@ static Result CreateGLScreen(bool coreContext, const std::string &caption, bool 
 
   // Initialize GLEW, allowing us to use features beyond OpenGL 1.2
   err = glewInit();
-  if (GLEW_OK != err)
+  // GLX is not required, ignore (from PPSSPP, SDL/SDLGLGraphicsContext.cpp)
+  if (GLEW_OK != err && GLEW_ERROR_NO_GLX_DISPLAY != err)
   {
     ErrorLog("OpenGL initialization failed: %s\n", glewGetErrorString(err));
     return Result::FAIL;
