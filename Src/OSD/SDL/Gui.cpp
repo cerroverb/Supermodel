@@ -1330,21 +1330,15 @@ static std::string GetRomPath(int selectedGame, const std::map<std::string, Game
     return {};  // no game
 }
 
-// Scale factor of the primary display, where the window opens (1 = 96 DPI). Windows only: a DPI aware build (per its manifest)
-// works in physical pixels, an unaware one is told 96 DPI and gets scaled by Windows. Elsewhere SDL reports the
-// monitor's physical DPI rather than the user's scaling preference.
-static float GetDPIScale()
+// Scale the UI to the display. Reported DPI is unreliable on Wayland and gamescope,
+// the display size is not. A 768x432 layout keeps it readable on a handheld.
+static float GetDisplayScale()
 {
-#ifdef _WIN32
-    float ddpi = 96.0f;
-    if (SDL_GetDisplayDPI(0, &ddpi, nullptr, nullptr) != 0) {
-        SDL_Log("Failed to get DPI: %s", SDL_GetError());
+    SDL_DisplayMode mode;
+    if (SDL_GetDesktopDisplayMode(0, &mode) != 0) {
         return 1.0f;
     }
-    return (std::max)(1.0f, ddpi / 96.0f);
-#else
-    return 1.0f;
-#endif
+    return (std::max)(1.0f, (std::min)(mode.w / 768.0f, mode.h / 432.0f));
 }
 
 std::vector<std::string> RunGUI(const std::string& configPath, const Util::Config::Node& fileConfig)
@@ -1361,7 +1355,7 @@ std::vector<std::string> RunGUI(const std::string& configPath, const Util::Confi
     Util::Config::MergeINISections(&config, DefaultConfig(), fullConfig);
 
     // Initialize SDL
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) < 0) {
         std::cerr << "SDL could not initialize! Error: " << SDL_GetError() << std::endl;
         return {};
     }
@@ -1378,13 +1372,14 @@ std::vector<std::string> RunGUI(const std::string& configPath, const Util::Confi
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_INPUT_FOCUS);
 
     // Create SDL window
-    s_uiScale = GetDPIScale();
-    SDL_Window* window = SDL_CreateWindow("SuperSetup", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, int(950 * s_uiScale), int(600 * s_uiScale), window_flags);
+    s_uiScale = GetDisplayScale();
+    SDL_Window* window = SDL_CreateWindow("SuperSetup", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, int(768 * s_uiScale), int(432 * s_uiScale), window_flags);
     if (!window) {
         std::cerr << "Window could not be created! Error: " << SDL_GetError() << std::endl;
         SDL_Quit();
         return {};
     }
+    SDL_MaximizeWindow(window);
 
     // Create OpenGL context
     SDL_GLContext glContext = SDL_GL_CreateContext(window);
